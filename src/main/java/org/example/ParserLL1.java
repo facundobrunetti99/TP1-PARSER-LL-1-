@@ -2,122 +2,107 @@ package org.example;
 
 import java.util.Scanner;
 
+/**
+ * Clase principal del Parser LL(1) con generación de árbol sintáctico
+ *
+ * Gramática implementada:
+ * E  -> T E'
+ * E' -> | T E'
+ * E' -> λ
+ * T  -> F T'
+ * T' -> . F T'
+ * T' -> λ
+ * F  -> P F'
+ * F' -> *
+ * F' -> λ
+ * P  -> ( E )
+ * P  -> L
+ * L  -> a
+ * L  -> b
+ * L  -> c
+ */
 public class ParserLL1 {
-
-    static String input;
-    static int index;
-    static char lookahead;
-
-    static void printHeader() {
-        System.out.println("┌────────────┬─────────────┐");
-        System.out.println("│ FUNCIÓN    │ CARÁCTER    │");
-        System.out.println("├────────────┼─────────────┤");
-    }
-
-    static void printFooter() {
-        System.out.println("└────────────┴─────────────┘");
-    }
-
-    static void printStep(String function) {
-        String displayChar = lookahead == '\0' ? "␣" : "'" + lookahead + "'";
-        System.out.printf("│ %-10s │ %-11s │%n", function, displayChar);
-    }
 
     public static void main(String[] args) {
         Scanner scanner = new Scanner(System.in);
+
+        System.out.println("════════════════════════════════════════");
+        System.out.println("      PARSER LL(1) - ANALIZADOR        ");
+        System.out.println("════════════════════════════════════════");
+        System.out.println("Gramática soportada:");
+        System.out.println("  Símbolos terminales: a, b, c, (, ), |, ., *");
+        System.out.println("  Operadores: | (disyunción), . (concatenación), * (clausura)");
+        System.out.println("════════════════════════════════════════");
+
         System.out.print("Ingrese una cadena: ");
-        input = scanner.nextLine();
+        String input = scanner.nextLine().trim();
         scanner.close();
 
-        index = 0;
-        lookahead = input.length() > 0 ? input.charAt(index) : '\0';
+        if (input.isEmpty()) {
+            System.out.println("Error: La cadena no puede estar vacía.");
+            return;
+        }
 
-        printHeader();
         try {
-            E(); // símbolo inicial
-            if (lookahead == '\0') {
-                printFooter();
-                System.out.println("Cadena válida.");
+            // Crear el parser
+            ParserCore parser = new ParserCore(input);
+
+            // Mostrar proceso de análisis
+            System.out.println("\nProceso de análisis:");
+            System.out.println("━━━━━━━━━━━━━━━━━━━━");
+            ParserLogger.printHeader();
+
+            // Realizar el análisis
+            TreeNode root = parser.parse();
+
+            // Verificar que se haya consumido toda la entrada
+            if (!parser.hasMoreInput()) {
+                ParserLogger.printFooter();
+                ParserLogger.printSuccess();
+
+                // Mostrar el árbol de análisis
+                displayParseTree(root, input);
+
             } else {
-                printFooter();
-                throw new RuntimeException();
+                ParserLogger.printFooter();
+                throw new RuntimeException("Caracteres adicionales al final de la cadena");
             }
+
         } catch (RuntimeException e) {
-            printFooter();
-            System.out.println("Error de sintaxis.");
+            ParserLogger.printFooter();
+            ParserLogger.printError(e.getMessage());
         }
     }
 
-    static void match(char expected) {
-        printStep("match('" + expected + "')");
-        if (lookahead == expected) {
-            index++;
-            lookahead = index < input.length() ? input.charAt(index) : '\0';
-        } else {
-            throw new RuntimeException();
-        }
+    /**
+     * Muestra el árbol de análisis sintáctico en diferentes formatos
+     */
+    private static void displayParseTree(TreeNode root, String input) {
+        // Mostrar árbol en consola
+        TreeVisualizer.printTreeHeader();
+        TreeVisualizer.printTree(root, "", true);
+
+        // Generar archivo .dot
+        String filename = "arbol_sintactico_" + sanitizeFilename(input) + ".dot";
+        TreeVisualizer.saveTreeAsDot(root, filename);
+
+        // Mostrar instrucciones adicionales
+        System.out.println("\n" + "═".repeat(50));
+        System.out.println("OPCIONES DE VISUALIZACIÓN:");
+        System.out.println("═".repeat(50));
+        System.out.println("1. Árbol mostrado arriba (formato texto)");
+        System.out.println("2. Archivo .dot generado: " + filename);
+        System.out.println("3. Para generar imagen PNG:");
+        System.out.println("   dot -Tpng " + filename + " -o arbol.png");
+        System.out.println("4. Para generar imagen SVG:");
+        System.out.println("   dot -Tsvg " + filename + " -o arbol.svg");
+        System.out.println("═".repeat(50));
     }
 
-    static void E() {
-        printStep("E()");
-        T();
-        EPrime();
-    }
-
-    static void EPrime() {
-        printStep("E'()");
-        if (lookahead == '|') {
-            match('|');
-            T();
-            EPrime();
-        }
-    }
-
-    static void T() {
-        printStep("T()");
-        F();
-        TPrime();
-    }
-
-    static void TPrime() {
-        printStep("T'()");
-        if (lookahead == '.') {
-            match('.');
-            F();
-            TPrime();
-        }
-    }
-
-    static void F() {
-        printStep("F()");
-        P();
-        FPrime();
-    }
-
-    static void FPrime() {
-        printStep("F'()");
-        if (lookahead == '*') {
-            match('*');
-        }
-    }
-
-    static void P() {
-        printStep("P()");
-        if (lookahead == '(') {
-            match('(');
-            E();
-            match(')');
-        } else {
-            L();
-        }
-    }
-
-    static void L() {
-        printStep("L()");
-        if (lookahead == 'a' || lookahead == 'b' || lookahead == 'c') {
-            match(lookahead);
-        } else {
-            throw new RuntimeException();
-        }
+    /**
+     * Limpia el nombre del archivo removiendo caracteres no válidos
+     */
+    private static String sanitizeFilename(String input) {
+        return input.replaceAll("[^a-zA-Z0-9]", "_").toLowerCase();
     }
 }
